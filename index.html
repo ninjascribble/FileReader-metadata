@@ -1,0 +1,99 @@
+<!doctype html>
+<html>
+<head></head>
+<body>
+<h1>Parsing File Metadata with FileReader</h1>
+<p>
+This demo uses the <a href="https://github.com/mattiasw/ExifReader/tree/iptc">ExifReader</a> JS library by
+<a href="https://github.com/mattiasw">Mattias Wallander</a> who has done a tremendous job of figuring out how
+to read embedded data through the <a href="https://developer.mozilla.org/en-US/docs/Web/API/FileReader">FileReader API</a>.
+Please note that the <code>ExifReader.js</code> file used in this demo was taken from the <code>iptc</code> branch, and
+will not work with the released version.
+</p>
+<p>
+To get started simply choose a file and hit the <strong>upload</strong> button. Nothing is posted; instead the file is
+processed in the browser and the extracted metadata will appear below the form.
+</p>
+<form method="post" action="/" id="uploadForm">
+    <input type="file" id="file"/>
+    <button type="submit">Upload</button>
+</form>
+<code><pre id="output"></pre></code>
+<script type="text/javascript" src="./ExifReader.js"></script>
+<script type="text/javascript">
+    ;(function() {
+
+    var uploadForm = document.getElementById('uploadForm');
+    var output = document.getElementById('output');
+
+    uploadForm.addEventListener('submit', submitEventHandler);
+
+    function submitEventHandler(evt) {
+
+        evt.stopPropagation();
+        evt.preventDefault();
+
+        var files = evt.target['file'].files;
+
+        if (files.length > 0) {
+            output.textContent = '';
+            Array.prototype.forEach.call(files, parseFile);
+        }
+        else {
+            output.textContent = 'No files selected';
+        }
+
+        return false;
+    }
+
+    function parseFile(file) {
+
+        var blob = file.slice(0, 131072);
+
+        parseExifData(blob);
+        parseXmpData(blob);
+    }
+
+    function parseExifData(blob) {
+
+        var reader = new FileReader();
+        var exif = new ExifReader();
+
+        reader.readAsArrayBuffer(blob);
+
+        reader.onloadend = function(evt) {
+
+            exif.load(reader.result);
+
+            output.textContent += 'Photographer: ' + exif.getTagDescription('By-line') + '\n\r';
+            output.textContent += 'Episode: ' + exif.getTagDescription('Keywords') + '\n\r';
+            output.textContent += 'Season: ' + exif.getTagDescription('Headline') + '\n\r';
+            output.textContent += 'Copyright: ' + exif.getTagDescription('Copyright Notice') + '\n\r';
+            output.textContent += 'Description: ' + exif.getTagDescription('Caption/Abstract') + '\n\r';
+        };
+    }
+
+    function parseXmpData(blob) {
+
+        var reader = new FileReader();
+        var parser = new DOMParser();
+        var pattern = /xpacket begin.*\?>(.*)<\?xpacket end/
+
+        reader.readAsText(blob);
+
+        reader.onloadend = function(evt) {
+
+            var normal = reader.result.replace(/\n/g, '');
+            var match = normal.match(pattern);
+            var x = parser.parseFromString('<root>' + match[1] + '</root>', 'text/xml');
+            var persons = x.querySelectorAll('PersonInImage li');
+
+            for (var i = 0; i < persons.length; i++) {
+                output.textContent += 'Person[' + i + ']: ' + persons[i].textContent + '\n\r';
+            }
+        };
+    }
+})();
+</script>
+</body>
+</html>
